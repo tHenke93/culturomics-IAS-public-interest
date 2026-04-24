@@ -311,7 +311,6 @@ make_barplot <- function(df, show_legend = FALSE) {
 }
 
 
-
 make_map_plot <- function(map_df, summary_df, centroids_df, title_text) {
   # Default offsets (defined once, outside of the loop)
     x_offset <- -2.5
@@ -378,25 +377,25 @@ make_map_plot <- function(map_df, summary_df, centroids_df, title_text) {
 ### Mapping the results
 
 ```{r}
-map_species <- make_map_plot(map_df = map_data, summary_df = species_counts,
+map_species <- make_map_plot(map_df = map_data, summary_df = distinct_species_counts,
                              centroids_df = centroids, 
   "Species Composition in e-commerce"
 )
 
-#creating a legend
-legend_source <- make_barplot(
-  species.summary %>% filter(Country == "Germany"),  # small subset is enough
-  show_legend = TRUE
-)
-legend_only <- get_legend(legend_source)
+map_species
 
-#adding the legend to the figure
-map_bar_species <- plot_grid(
-  map_species,
-  legend_only,
-  ncol = 1,
-  rel_heights = c(1, 0.1)
-)
+# #creating a legend
+# legend_source <- make_barplot(filter(distinct_species_counts, country == "Germany"), show_legend = TRUE)
+# 
+# legend_only <- get_legend(legend_source)
+# 
+# #adding the legend to the figure
+# map_bar_species <- plot_grid(
+#   map_species,
+#   legend_only,
+#   ncol = 1,
+#   rel_heights = c(1, 0.1)
+# )
 ```
 
 ### Creating a heat map of change
