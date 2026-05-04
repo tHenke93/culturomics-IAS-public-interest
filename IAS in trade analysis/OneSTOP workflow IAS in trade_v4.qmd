@@ -290,7 +290,11 @@ centroids <- st_centroid(map_data) %>%
 
 i\) a function to create individual stacked bar plots per country. The plots indicate the composition of animal and plant species found in Online retailers (left bar) and Peer-to-peer trade platforms (right) in 2021 and 2024
 
-ii\) a function to display the individual bar plots on the underlying map
+ii\) a function to display the individual bar plots on the underlying ma
+
+```{r}
+```
+
 
 ```{r}
 make_barplot <- function(df, show_legend = FALSE) {
@@ -312,16 +316,14 @@ make_barplot <- function(df, show_legend = FALSE) {
 
 
 make_map_plot <- function(map_df, summary_df, centroids_df, title_text) {
-  # Default offsets (defined once, outside of the loop)
-    x_offset <- -2.5
-    x_offset_max <- 2.5
-    y_offset <- -2.5
-    y_offset_max <- 2.5
-
   base_map <- ggplot() +
     geom_sf(data = map_df, fill = "grey90", color = "black") +
     theme_void() +
     labs(title = title_text)
+  
+  # Define size of grobs
+  x_width = 5
+  y_width = 5
 
   for (i in 1:nrow(centroids_df)) {
     country_name <- centroids_df$country[i]
@@ -331,34 +333,28 @@ make_map_plot <- function(map_df, summary_df, centroids_df, title_text) {
     # Netherlands: move left
     if (country_name == "Netherlands") {
       x_offset <- -6
-      x_offset_max <- -1
       y_offset <- -2
-      y_offset_max <- 3
     }
     
     # Czechia: move right and up
-    if (country_name == "Czechia") {
-      x_offset =- 1
-      x_offset_max = 6
+    else if (country_name == "Czechia") {
+      x_offset = 1
       y_offset = 0
-      y_offset_max = 5
     }
     
-    # Otherwise we have to put the values to zero - of we would offset the following country too!
+    # Otherwise we have to put the values back to default.
     else{
-      x_offset = 0
-      y_offset = 0
-      x_offset_max = 0
-      y_offset_max = 0
+      x_offset <- -2.5
+      y_offset <- -2.5
     }
     
     base_map <- base_map +
       annotation_custom(
         grob = ggplotGrob(p),
         xmin = centroids_df$X[i] + x_offset,
-        xmax = centroids_df$X[i] + x_offset_max,
+        xmax = centroids_df$X[i] + x_offset + x_width,
         ymin = centroids_df$Y[i] + y_offset,
-        ymax = centroids_df$Y[i] + y_offset_max
+        ymax = centroids_df$Y[i] + y_offset + y_width
       )
   }
   
@@ -367,7 +363,7 @@ make_map_plot <- function(map_df, summary_df, centroids_df, title_text) {
       "text",
       x = 25,
       y = 42,
-      label = "International   kf",   #would not print the whole of International otherwise
+      label = "International",   #would not print the whole of International otherwise
       size = 3
     )
   return(base_map)
