@@ -13,7 +13,7 @@ editor: visual
 ## Packages
 
 ```{r}
-# Tidyverse packages
+# Default tidyverse packages
 library(readr)
 library(dplyr)
 library(ggplot2)
@@ -22,15 +22,21 @@ library(purrr)
 library(tidyr)
 library(stringr)
 
-# 
-library(timetk)
-library(anomalize)
-library(pracma)
+# Packages for maps
 library(rnaturalearth)
 library(rnaturalearthdata)
 library(sf)
+
+# Plotting packages
 library(ggpattern)
 library(cowplot)
+
+#  PCka
+library(timetk)
+library(anomalize)
+library(pracma)
+
+
 ```
 
 ## Loading data
@@ -67,7 +73,6 @@ data_to_add <- list.files("data/species", pattern = "csv", full.names = T) %>%
 # Combine all data into one
 data <- bind_rows(data, data_to_add)
 
-
 data %>% 
   group_by(species, country) %>% 
   slice_min(date) %>% 
@@ -90,7 +95,7 @@ top_species <- weekly_species_summary %>%
 
 print(top_species)
 #indicate the species names where it is top 10
-Data <- Data %>%
+data <- data %>%
   mutate(species_grouped = if_else(species %in% top_species, as.character(species), "other"))
 
 ```

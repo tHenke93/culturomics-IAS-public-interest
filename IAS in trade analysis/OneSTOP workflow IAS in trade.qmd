@@ -27,20 +27,20 @@ library(patchwork)
 ### Set working space
 
 ```{r}
-setwd("C:/Users/henke/Desktop/library/Projects/trade data")
+setwd("C:/Users/henke/Desktop/library/Projects/trade_data")
 ```
 
 ## Loading data
 
 ```{r}
-species.2021 <- read.csv("species list 2021.csv")
-species.2024 <- read.csv("species list 2024.csv")
+species.2021 <- read.csv("species_list_2021.csv")
+species.2024 <- read.csv("species_list_2024.csv")
 
-results.2021 <- read.csv("Results 2021.csv")
-results.2024 <- read.csv("results 2024.csv")
+results.2021 <- read.csv("results_2021.csv")
+results.2024 <- read.csv("results_2024.csv")
 
-unique.records.2021 <- read.csv("unique records 2021.csv")
-unique.records.2024 <- read.csv("unique records 2024.csv")
+unique.records.2021 <- read.csv("unique_records_2021.csv")
+unique.records.2024 <- read.csv("unique_records_2024.csv")
 ```
 
 ### Combine data
@@ -48,26 +48,27 @@ unique.records.2024 <- read.csv("unique records 2024.csv")
 ```{r}
 #select and rename columns of 2021 and 2024 data
 species.2021.sel <- species.2021 %>%
+  rename_with(tolower) %>% 
   select(
-    species = Scientific.name,
-    Kingdom.2021 =  Kingdom,
-    Status.2021 = Union.concern.status,
-    Sector.2021 = Sector
+    species = scientific.name,
+    status.2021 = union.concern.status,
+    sector.2021 = sector
   )
 
 species.2024.sel <- species.2024 %>%
+  rename_with(tolower) %>% 
   select(
     species,
-    Status.2024 = status,
-    Kingdom.2024 = Kingdom,
-    Sector.2024 = Sector,
-    survey.list.2021 = Trade.2021.survey.species.list,
-    Found.in.trade.2021,
-    survey.list.2024 = Trade.survey.list.2024
+    status.2024 = status,
+    sector.2024 = Sector,
+    survey.list.2021 = trade.2021.survey.species.list,
+    found.in.trade.2021,
+    survey.list.2024 = trade.survey.list.2024
   )
 
 #to check alignment of species list
-identical(species.2021.sel$species, species.2024.sel$species) #returns NO
+## This works only in case the list is ordered!
+# identical(species.2021.sel$species, species.2024.sel$species) #returns NO
 setdiff(species.2021.sel$species, species.2024.sel$species) #highlights 3 species that were proposed in 2021 but not included in 2024
 setdiff(species.2024.sel$species, species.2021.sel$species) #highlights the 22 species that were added as "proposed" to the 2024 list
 
@@ -78,19 +79,18 @@ species.combined <- species.2024.sel %>%
 
 species.combined <- species.combined %>%
   mutate(
-    Found.in.trade.2021 = case_when(
+    found.in.trade.2021 = case_when(
       Found.in.trade.2021 == "Found in trade" ~ "Yes",
       Found.in.trade.2021 == "Not found in trade" ~ "No",
-      Found.in.trade.2021 == "" ~ NA_character_,
+      # Found.in.trade.2021 == "" ~ NA_character_,
       TRUE ~ NA_character_
     ),
     Status.2024 = case_when(
-      Status.2024 == "Union concern - delayed 2027" ~ "Union concern",
-      Status.2024 == "Union concern - delayed 2024" ~ "Union concern",
-      Status.2024 == "Union concern" ~ "Union concern",
+      str_detect(Status.2024, "^Union concern") ~ "Union concern",
       Status.2024 == "Proposed" ~ "Proposed"
     )
   )
+
 
 #add which species were found in 2024 in trade (yes/no)
 found.in.trade.2021 <- unique(unique.records.2021$Species.found.as.listed.in.species.list)

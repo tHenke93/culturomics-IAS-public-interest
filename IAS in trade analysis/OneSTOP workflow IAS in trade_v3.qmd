@@ -61,9 +61,6 @@ unique.records.2024 <- read.csv("data/unique_records_2024.csv") %>%
   select(species, platform, kingdom, country) %>% 
   mutate(year = "2024")
 
-unique.records.all <- bind_rows(unique.records.2024, unique.records.2021) %>% 
-  mutate(across(kingdom,~factor(.x, levels = c("Plant", "Animal"))))
-
 # surveyed species in 2021
 surveyed.in.2021 <- unique.records.2021 %>% 
   pull("species") %>% 
@@ -243,47 +240,56 @@ ggplot(plot_data, aes(x = category, y = n, fill = category)) +
 #defining colors for displaying Plants vs Animals
 colors <- c(
   "Plant" = "#1b9e77",
-  # "Animal" = "#377eb8"
-  "Animal" = "#cb5e00ff"
+  "Animal" = "#377eb8"
 )
 
 #adjusting the data to explore the development of species presence (yes/no) in trade
-distinct_species <- unique.records.all %>%
-  filter(!str_detect(species, "sp[p]*[.]$")) %>% 
-  distinct_all()
+plot_species <- bind_rows(unique.records.2021, unique.records.2024) %>%
+  filter(!str_detect(species, "sp[p]*[.]$"))
 
-distinct_species_counts <- distinct_species %>% 
-  count(country, year, platform, kingdom)
-
-all_species_counts <- unique.records.all %>% 
-  filter(!str_detect(species, "sp[p]*[.]$")) %>% 
+plot_records <- plot_species %>% 
   count(country, year, platform, kingdom) %>%
   mutate(across(kingdom,~factor(.x, levels = c("Plant", "Animal"))))
-
-
 
 ```
 
 ### Creating the underlying map
 
 ```{r}
-# Set the countries of interest
+
+europe <- ne_countries(scale = "medium", continent = "Europe", returnclass = "sf")
+
+unique(europe$name)
+
+
+# Crop to mainland Europe
+europe_cropped <- st_crop(
+  europe,
+  xmin = -10, xmax = 35,
+  ymin = 34, ymax = 72
+)
+
+
 countries <- c("Germany", "Spain", "Czechia", "France", "Italy", "Netherlands")
 
-# Get the map of Europe as sf object
-map_data <- ne_countries(scale = "medium", continent = "Europe", returnclass = "sf") %>% 
-  select(geometry, name) %>%
-  filter(name %in% countries) %>% 
-  st_crop(xmin = -10, xmax = 35, ymin = 34, ymax = 72)
+map_data <- europe_cropped %>%
+  filter(name %in% countries)
 
-centroids <- st_centroid(map_data) %>% 
-  st_coordinates() %>% 
-  as.data.frame() %>% 
-  bind_cols(country = map_data$name) %>% 
-  add_row(X = 25,   # longitude (adjust visually)
+centroids <- st_centroid(map_data)
+
+centroids_df <- as.data.frame(st_coordinates(centroids))
+centroids_df$Country <- map_data$name
+
+#since we have "International data, we will add a manual location for it on the map
+centroids_df <- rbind(
+  centroids_df,
+  data.frame(
+    X = 25,   # longitude (adjust visually)
     Y = 45,   # latitude (adjust visually)
-    country = "International"
+    Country = "International"
   )
+)
+
 
 ```
 
@@ -291,82 +297,85 @@ centroids <- st_centroid(map_data) %>%
 
 i\) a function to create individual stacked bar plots per country. The plots indicate the composition of animal and plant species found in Online retailers (left bar) and Peer-to-peer trade platforms (right) in 2021 and 2024
 
-ii\) a function to display the individual bar plots on the underlying ma
-
-```{r}
-```
+ii\) a function to display the individual bar plots on the underlying map
 
 ```{r}
 make_barplot <- function(df, show_legend = FALSE) {
-   df %>% 
-    complete(platform, year, kingdom, fill = list(n = 0)) %>%
-    ggplot(aes(x = platform, y = n, fill = kingdom)) +
-      geom_col(position = "fill") +
-      facet_wrap(~year) +
-      scale_fill_manual(values = colors, drop = FALSE) +
-       labs(
-        x = "Platform",
-        fill = "Kingdom"
-      ) +
-      theme_void()+
-      theme(
-        legend.position = if_else(show_legend, "bottom", "none")
-      )
+   df <- df %>%
+    tidyr::complete(
+      Platform,
+      year,
+      Kingdom = c("Plant", "Animal"),
+      fill = list(n = 0)
+    )
+  ggplot(df, aes(x = Platform, y = n, fill = Kingdom)) +
+    geom_col(position = "fill") +
+    facet_wrap(~year) +
+    scale_fill_manual(values = colors, drop = FALSE) +
+     labs(
+      x = "Platform",
+      fill = "Kingdom"
+    ) +
+    theme_void()+
+    theme(
+      legend.position = if (show_legend) "bottom" else "none"
+    )
 }
 
 
-make_map_plot <- function(map_df, summary_df, centroids_df, title_text) {
+
+make_map_plot <- function(summary_data, title_text) {
+
   base_map <- ggplot() +
-    geom_sf(data = map_df, fill = "grey90", color = "black") +
+    geom_sf(data = map_data, fill = "grey90", color = "black") +
     theme_void() +
     labs(title = title_text)
-  
-  # Define size of grobs
-  x_width = 5
-  y_width = 5
 
   for (i in 1:nrow(centroids_df)) {
-    country_name <- centroids_df$country[i]
 
-    p <- make_barplot(filter(summary_df, country == country_name))
+    country_name <- centroids_df$Country[i]
 
-    # Netherlands: move left
-    if (country_name == "Netherlands") {
-      x_offset <- -6
-      y_offset <- -2
-    }
-    
-    # Czechia: move right and up
-    else if (country_name == "Czechia") {
-      x_offset = 1
-      y_offset = 0
-    }
-    
-    # Otherwise we have to put the values back to default.
-    else{
-      x_offset <- -x_width/2
-      y_offset <- -y_width/2
-    }
-    
-    base_map <- base_map +
-      annotation_custom(
-        grob = ggplotGrob(p),
-        xmin = centroids_df$X[i] + x_offset,
-        xmax = centroids_df$X[i] + x_offset + x_width,
-        ymin = centroids_df$Y[i] + y_offset,
-        ymax = centroids_df$Y[i] + y_offset + y_width
-      )
+    p <- make_barplot(filter(summary_data, Country == country_name))
+
+    # Default offsets
+x_offset <- -2.5
+x_offset_max <- 2.5
+y_offset <- -2.5
+y_offset_max <- 2.5
+
+# Netherlands: move left
+if (country_name == "Netherlands") {
+  x_offset <- -6
+  x_offset_max <- -1
+  y_offset <- -2
+  y_offset_max <- 3
+}
+
+# Czechia: move right and up
+if (country_name == "Czechia") {
+  x_offset <- 1
+  x_offset_max <- 6
+  y_offset <- 0
+  y_offset_max <- 5
+}
+
+base_map <- base_map +
+  annotation_custom(
+    grob = ggplotGrob(p),
+    xmin = centroids_df$X[i] + x_offset,
+    xmax = centroids_df$X[i] + x_offset_max,
+    ymin = centroids_df$Y[i] + y_offset,
+    ymax = centroids_df$Y[i] + y_offset_max
+  )
   }
-  
-  base_map <- base_map +
-    annotate(
-      "text",
-      x = 25,
-      y = 42,
-      label = "International  ",   #would not print the whole of International otherwise
-      size = 3
-    )
-  
+base_map <- base_map +
+  annotate(
+    "text",
+    x = 25,
+    y = 42,
+    label = "International   kf",   #would not print the whole of International otherwise
+    size = 3
+  )
   return(base_map)
 }
 ```
@@ -374,16 +383,16 @@ make_map_plot <- function(map_df, summary_df, centroids_df, title_text) {
 ### Mapping the results
 
 ```{r}
-map_species <- make_map_plot(map_df = map_data, summary_df = distinct_species_counts,
-                             centroids_df = centroids, 
-  "Species composition in e-commerce"
+map_species <- make_map_plot(
+  species.summary,
+  "Species Composition in e-commerce"
 )
 
-map_species
-
 #creating a legend
-legend_source <- make_barplot(filter(distinct_species_counts, country == "Germany"), show_legend = TRUE)
-
+legend_source <- make_barplot(
+  species.summary %>% filter(Country == "Germany"),  # small subset is enough
+  show_legend = TRUE
+)
 legend_only <- get_legend(legend_source)
 
 #adding the legend to the figure
@@ -393,8 +402,6 @@ map_bar_species <- plot_grid(
   ncol = 1,
   rel_heights = c(1, 0.1)
 )
-
-map_bar_species
 ```
 
 ### Creating a heat map of change
